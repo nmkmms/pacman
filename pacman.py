@@ -7,6 +7,7 @@ import tracemalloc
 # Game attributes
 BLOCK_SIZE = 32
 LEVEL_NO = 2
+PACMAN_SPEED = 0.05
 
 
 class Block(pygame.sprite.Sprite):
@@ -123,7 +124,7 @@ class Pacman(pygame.sprite.Sprite):
         way_back = []
 
         while stack_route[-1] != 'found':
-            time.sleep(0.01)
+            time.sleep(PACMAN_SPEED)
             if stack_route[-1]:
                 next = stack_route[-1].pop()
                 self.func_way(next)
@@ -153,8 +154,14 @@ class Pacman(pygame.sprite.Sprite):
         fruit_x = fruit.rect.x // BLOCK_SIZE
         fruit_y = fruit.rect.y // BLOCK_SIZE
 
-        route = {'left': -1, 'right': 1, 'up': -1, 'down': 1}
-        stack.sort(key=lambda x: abs(pos_x - fruit_x + pos_y - fruit_y + route[x]), reverse=True)
+        val_func = lambda x1, x2: (x1 - x2) / abs(x1 - x2) if x1 != x2 else -1
+        val_route = {
+            'left':  val_func(pos_x, fruit_x), 
+            'right': val_func(fruit_x, pos_x), 
+            'up':    val_func(pos_y, fruit_y), 
+            'down':  val_func(fruit_y, pos_y)
+        }
+        stack.sort(key=lambda x: abs(abs(pos_x - fruit_x) + abs(pos_y - fruit_y) - val_route[x]), reverse=True)
 
 
     def greedy(self, fruit: Fruit):
@@ -164,7 +171,7 @@ class Pacman(pygame.sprite.Sprite):
         way_back = []
 
         while stack_route[-1] != 'found':
-            time.sleep(0.01)
+            time.sleep(PACMAN_SPEED)
             if stack_route[-1]:
                 self.manhattan_sort(stack_route[-1], fruit)
                 next = stack_route[-1].pop()
@@ -232,10 +239,10 @@ def main():
         draw()
 
         # DFS
-        run_alg(pac.dfs)
+        # run_alg(pac.dfs)
 
         # Replace pacman to starting (random) position
-        pac = Pacman(x_pac, y_pac)
+        # pac = Pacman(x_pac, y_pac)
 
         # Greedy alogithm
         run_alg(pac.greedy, arg=fruit)
