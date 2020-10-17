@@ -29,7 +29,6 @@ class Fruit(pygame.sprite.Sprite):
 
 class Pacman(pygame.sprite.Sprite):
     """Pacman character."""
-    steps = 0
 
     opposite_way = {
         'left': 'right',
@@ -47,14 +46,19 @@ class Pacman(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=(x, y))
 
 
+    def get_position(self) -> (int, int):
+        """Get pacman position."""
+        pos_x = self.rect.x // BLOCK_SIZE
+        pos_y = self.rect.y // BLOCK_SIZE
+        return pos_x, pos_y
+
+
     def update(self, keys):
         """Moves pacman using keys input.
 
         Change image according to pacman's moves.
         """
-        dx = dy = 0
-        pos_x = self.rect.x // BLOCK_SIZE
-        pos_y = self.rect.y // BLOCK_SIZE
+        pos_x, pos_y = self.get_position()
 
         if keys[pygame.K_LEFT] and not WORLD[pos_y][pos_x - 1] == '=':
             self.left()
@@ -88,34 +92,23 @@ class Pacman(pygame.sprite.Sprite):
 
     def finished(self):
         """Check if pacman found a fruit."""
-        pos_x = self.rect.x // BLOCK_SIZE
-        pos_y = self.rect.y // BLOCK_SIZE
+        pos_x, pos_y = self.get_position()
         if WORLD[pos_y][pos_x] == '*':
             return True
 
     def get_route(self):
         """Adds possible routes from current location."""
-        pos_x = self.rect.x // BLOCK_SIZE
-        pos_y = self.rect.y // BLOCK_SIZE
+        pos_x, pos_y = self.get_position()
 
         leafs = []
         if not WORLD[pos_y][pos_x + 1] == '=':
-            #self.node.right = Node()
-            #print('r')
             leafs.append('right')
         if not WORLD[pos_y][pos_x - 1] == '=':
-            #self.node.left = Node(self.node)
-            #print('l')
             leafs.append('left')
         if not WORLD[pos_y + 1][pos_x] == '=':
-            #self.node.down = Node(self.node)
-            #print('d')
             leafs.append('down')
         if not WORLD[pos_y - 1][pos_x] == '=':
-            #print('u')
-            #self.node.up = Node(self.node)
             leafs.append('up')
-        #leafs = self.node.get_leafs()
         shuffle(leafs)
         return leafs
 
@@ -125,10 +118,9 @@ class Pacman(pygame.sprite.Sprite):
 
     def dfs(self):
         """Finds a way to the fruit using breadth-first search algorithm."""
-        #x = [_ for _ in range(100000)]
+        steps = 0
         stack_route = [self.get_route()]
         way_back = []
-        came_back = False
 
         while stack_route[-1] != 'found':
             time.sleep(0.01)
@@ -140,18 +132,60 @@ class Pacman(pygame.sprite.Sprite):
                 if back in stack_route[-1]:
                     stack_route[-1].remove(back)
                 way_back.append(back)
-                came_back = False
             else:
                 stack_route.pop()
                 next = way_back.pop()
                 self.func_way(next)
-                came_back = True
-            self.steps += 1
+            steps += 1
             draw()
             if self.finished():
                 break
 
-        print(f"Statistic for DFS:\n\tSteps: {self.steps}")
+        print(f"Statistic for DFS:\n\tSteps: {steps}")
+
+    
+    def manhattan_sort(self, stack: list, fruit: Fruit):
+        """Sort route list using manhattan distance.
+        
+        From bigger to lower.
+        """
+        pos_x, pos_y = self.get_position()
+        fruit_x = fruit.rect.x // BLOCK_SIZE
+        fruit_y = fruit.rect.y // BLOCK_SIZE
+
+        route = {'left': -1, 'right': 1, 'up': -1, 'down': 1}
+        stack.sort(key=lambda x: abs(pos_x - fruit_x + pos_y - fruit_y + route[x]), reverse=True)
+
+
+    def greedy(self, fruit: Fruit):
+        """Finds a way to the fruit using greedy algorithm."""
+        steps = 0
+        stack_route = [self.get_route()]
+        way_back = []
+
+        while stack_route[-1] != 'found':
+            time.sleep(0.01)
+            if stack_route[-1]:
+                self.manhattan_sort(stack_route[-1], fruit)
+                next = stack_route[-1].pop()
+                self.func_way(next)
+                stack_route.append(self.get_route())
+                back = self.opposite_way[next]
+                if back in stack_route[-1]:
+                    stack_route[-1].remove(back)
+                way_back.append(back)
+            else:
+                stack_route.pop()
+                next = way_back.pop()
+                self.func_way(next)
+            steps += 1
+            draw()
+            if self.finished():
+                break
+
+        print(f"Statistic for greedy algorithm:\n\tSteps: {steps}")
+
+
 
 
 def main():
@@ -179,11 +213,13 @@ def main():
     x_fruit, y_fruit = get_random_place('*')
     fruit = Fruit(x_fruit, y_fruit)
 
+    # if launched with arg "play"
     if len(sys.argv) > 1 and sys.argv[1] == 'play':
         # Start game loop
         while True:
             # Redraw background and pacman
             draw()
+
             # Listen events
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -193,18 +229,18 @@ def main():
                     pac.update(keys)
                 pygame.display.flip()
     else:
-        # Start searches
-        #for row in WORLD:
-         #   print(row)
         draw()
-        time.sleep(2)
-        tracemalloc.start()
-        pac.dfs()
-        snapshot = tracemalloc.take_snapshot()
-        stats = snapshot.statistics('lineno')
-        total = sum([s.size for s in stats])
-        print(f"\tTotal memory usage: {total/10**3}MB")
-        tracemalloc.stop()
+
+        # DFS
+        run_alg(pac.dfs)
+
+        # Replace pacman to starting (random) position
+        pac = Pacman(x_pac, y_pac)
+
+        # Greedy alogithm
+        run_alg(pac.greedy, arg=fruit)
+
+        # Infinite loop, waiting for closing
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -238,6 +274,7 @@ def get_random_place(character: str):
     while not WORLD[y][x] == ' ':
         x = randint(1, 18)
         y = randint(1, 18)
+
     # Add to level list
     WORLD[y][x] = character
 
@@ -247,8 +284,19 @@ def get_random_place(character: str):
     return (x + 16, y + 16)
 
 
+def run_alg(func, arg=None):
+    """Run algorithm, measure memory costs."""
+    time.sleep(2)
+    tracemalloc.start()
+    func(arg) if arg else func()
+    snapshot = tracemalloc.take_snapshot()
+    stats = snapshot.statistics('lineno')
+    total = sum([s.size for s in stats])
+    print(f"\tTotal memory usage: {total/10**3}MB")
+    tracemalloc.stop()
+
+
 if __name__ == '__main__':
     pygame.init()
     screen = pygame.display.set_mode((640, 640))
     main()
-
