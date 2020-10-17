@@ -193,8 +193,6 @@ class Pacman(pygame.sprite.Sprite):
         print(f"Statistic for greedy algorithm:\n\tSteps: {steps}")
 
 
-
-
 def main():
     # Set title
     pygame.display.set_caption('Pacman')
@@ -239,10 +237,10 @@ def main():
         draw()
 
         # DFS
-        # run_alg(pac.dfs)
+        run_alg(pac.dfs)
 
         # Replace pacman to starting (random) position
-        # pac = Pacman(x_pac, y_pac)
+        pac = Pacman(x_pac, y_pac)
 
         # Greedy alogithm
         run_alg(pac.greedy, arg=fruit)
