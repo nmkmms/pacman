@@ -5,7 +5,8 @@ import pygame
 import tracemalloc
 
 # Game attributes
-BLOCK_SIZE = 32
+WORLD_SIZE = 320
+BLOCK_SIZE = int(WORLD_SIZE / 20)
 LEVEL_NO = 2
 PACMAN_SPEED = 0.05
 
@@ -14,8 +15,8 @@ class Block(pygame.sprite.Sprite):
     """Wall block."""
     def __init__(self, x: int, y: int):
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.image.load("img/wall.png").convert_alpha()
-        self.rect = self.image.get_rect(center=(x+16, y+16))
+        self.image = pygame.image.load("img16/wall.png").convert_alpha()
+        self.rect = self.image.get_rect(center=(x+8, y+8))
 
 
 class Fruit(pygame.sprite.Sprite):
@@ -23,7 +24,7 @@ class Fruit(pygame.sprite.Sprite):
     def __init__(self, x: int, y: int):
         """Find random place on map and inits there."""
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.image.load("img/fruit.gif").convert_alpha()
+        self.image = pygame.image.load("img16/fruit.gif").convert_alpha()
 
         self.rect = self.image.get_rect(center=(x, y))
 
@@ -42,7 +43,7 @@ class Pacman(pygame.sprite.Sprite):
     def __init__(self, x: int, y: int):
         """Find random place for pacman and inits there."""
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.image.load("img/pacman-right.gif").convert_alpha()
+        self.image = pygame.image.load("img16/pacman-right.gif").convert_alpha()
 
         self.rect = self.image.get_rect(center=(x, y))
 
@@ -72,22 +73,22 @@ class Pacman(pygame.sprite.Sprite):
 
 
     def right(self):
-        self.image = pygame.image.load("img/pacman-right.gif").convert_alpha()
+        self.image = pygame.image.load("img16/pacman-right.gif").convert_alpha()
         self.rect.x += BLOCK_SIZE
 
 
     def left(self):
-        self.image = pygame.image.load("img/pacman-left.gif").convert_alpha()
+        self.image = pygame.image.load("img16/pacman-left.gif").convert_alpha()
         self.rect.x -= BLOCK_SIZE
 
 
     def down(self):
-        self.image = pygame.image.load("img/pacman-down.gif").convert_alpha()
+        self.image = pygame.image.load("img16/pacman-down.gif").convert_alpha()
         self.rect.y += BLOCK_SIZE
 
 
     def up(self):
-        self.image = pygame.image.load("img/pacman-up.gif").convert_alpha()
+        self.image = pygame.image.load("img16/pacman-up.gif").convert_alpha()
         self.rect.y -= BLOCK_SIZE
 
 
@@ -286,7 +287,7 @@ def get_random_place(character: str):
     # Scale
     x *= BLOCK_SIZE
     y *= BLOCK_SIZE
-    return (x + 16, y + 16)
+    return (x + 8, y + 8)
 
 
 def run_alg(func, arg=None):
@@ -303,5 +304,5 @@ def run_alg(func, arg=None):
 
 if __name__ == '__main__':
     pygame.init()
-    screen = pygame.display.set_mode((640, 640))
+    screen = pygame.display.set_mode((WORLD_SIZE, WORLD_SIZE))
     main()
