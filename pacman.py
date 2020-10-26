@@ -8,7 +8,7 @@ import tracemalloc
 WORLD_SIZE = 320
 BLOCK_SIZE = int(WORLD_SIZE / 20)
 LEVEL_NO = 2
-PACMAN_SPEED = 0.05
+PACMAN_SPEED = 0.03
 
 
 class Block(pygame.sprite.Sprite):
@@ -39,7 +39,6 @@ class Pacman(pygame.sprite.Sprite):
         'up': 'down',
     }
 
-
     def __init__(self, x: int, y: int):
         """Find random place for pacman and inits there."""
         pygame.sprite.Sprite.__init__(self)
@@ -47,13 +46,11 @@ class Pacman(pygame.sprite.Sprite):
 
         self.rect = self.image.get_rect(center=(x, y))
 
-
     def get_position(self) -> (int, int):
         """Get pacman position."""
         pos_x = self.rect.x // BLOCK_SIZE
         pos_y = self.rect.y // BLOCK_SIZE
         return pos_x, pos_y
-
 
     def update(self, keys):
         """Moves pacman using keys input.
@@ -71,26 +68,21 @@ class Pacman(pygame.sprite.Sprite):
         elif keys[pygame.K_DOWN] and not WORLD[pos_y + 1][pos_x] == '=':
             self.down()
 
-
     def right(self):
         self.image = pygame.image.load("img16/pacman-right.gif").convert_alpha()
         self.rect.x += BLOCK_SIZE
-
 
     def left(self):
         self.image = pygame.image.load("img16/pacman-left.gif").convert_alpha()
         self.rect.x -= BLOCK_SIZE
 
-
     def down(self):
         self.image = pygame.image.load("img16/pacman-down.gif").convert_alpha()
         self.rect.y += BLOCK_SIZE
 
-
     def up(self):
         self.image = pygame.image.load("img16/pacman-up.gif").convert_alpha()
         self.rect.y -= BLOCK_SIZE
-
 
     def finished(self):
         """Check if pacman found a fruit."""
@@ -117,35 +109,73 @@ class Pacman(pygame.sprite.Sprite):
     def func_way(self, way: str):
         eval(f"self.{way}()")
 
-
-    def dfs(self):
-        """Finds a way to the fruit using breadth-first search algorithm."""
+    def dfs(self, greedy=False, fruit=None):
+        """Finds a way to the fruit using depth-first search algorithm."""
         steps = 0
         stack_route = [self.get_route()]
         way_back = []
 
-        while stack_route[-1] != 'found':
+        while stack_route:
             time.sleep(PACMAN_SPEED)
             if stack_route[-1]:
-                next = stack_route[-1].pop()
-                self.func_way(next)
+                if greedy:
+                    self.manhattan_sort(stack_route[-1], fruit)
+                nxt = stack_route[-1].pop()
+                self.func_way(nxt)
                 stack_route.append(self.get_route())
-                back = self.opposite_way[next]
+                back = self.opposite_way[nxt]
                 if back in stack_route[-1]:
                     stack_route[-1].remove(back)
                 way_back.append(back)
             else:
                 stack_route.pop()
-                next = way_back.pop()
-                self.func_way(next)
+                nxt = way_back.pop()
+                self.func_way(nxt)
             steps += 1
             draw()
             if self.finished():
                 break
 
-        print(f"Statistic for DFS:\n\tSteps: {steps}")
+        if not greedy:
+            print(f"Statistic for DFS:\n\tSteps: {steps}")
+        else:
+            print(f"Statistic for greedy algorithm:\n\tSteps: {steps}")
 
-    
+    def bfs(self):
+        """Finds a way to the fruit using breadth-first search algorithm."""
+        steps = 0
+        queue = deque()
+        queue.extend([[route] for route in self.get_route()])
+        current_way = []
+        was_here = set()
+
+        def make_step(step):
+            time.sleep(PACMAN_SPEED)
+            self.func_way(step)
+            draw()
+            nonlocal steps
+            steps += 1
+
+        while queue:
+            nxt = queue.popleft()
+            while len(current_way) > len(nxt):
+                make_step(self.opposite_way[current_way.pop()])
+            while nxt[:len(current_way)] != current_way:
+                make_step(self.opposite_way[current_way.pop()])
+            for n in nxt[len(current_way):]:
+                current_way.append(n)
+                make_step(n)
+            if not (place := self.get_position()) in was_here:
+                if self.finished():
+                    print('found')
+                    break
+                was_here.add(place)
+                for way in self.get_route():
+                    if way != self.opposite_way[current_way[-1]]:
+                        queue.append(list(current_way + [way]))
+
+        print(f"Statistic for BFS:\n\tSteps: {steps}")
+
     def manhattan_sort(self, stack: list, fruit: Fruit):
         """Sort route list using manhattan distance.
         
@@ -163,35 +193,6 @@ class Pacman(pygame.sprite.Sprite):
             'down':  val_func(fruit_y, pos_y)
         }
         stack.sort(key=lambda x: abs(abs(pos_x - fruit_x) + abs(pos_y - fruit_y) - val_route[x]), reverse=True)
-
-
-    def greedy(self, fruit: Fruit):
-        """Finds a way to the fruit using greedy algorithm."""
-        steps = 0
-        stack_route = [self.get_route()]
-        way_back = []
-
-        while stack_route[-1] != 'found':
-            time.sleep(PACMAN_SPEED)
-            if stack_route[-1]:
-                self.manhattan_sort(stack_route[-1], fruit)
-                next = stack_route[-1].pop()
-                self.func_way(next)
-                stack_route.append(self.get_route())
-                back = self.opposite_way[next]
-                if back in stack_route[-1]:
-                    stack_route[-1].remove(back)
-                way_back.append(back)
-            else:
-                stack_route.pop()
-                next = way_back.pop()
-                self.func_way(next)
-            steps += 1
-            draw()
-            if self.finished():
-                break
-
-        print(f"Statistic for greedy algorithm:\n\tSteps: {steps}")
 
 
 def main():
@@ -219,13 +220,12 @@ def main():
     x_fruit, y_fruit = get_random_place('*')
     fruit = Fruit(x_fruit, y_fruit)
 
+    draw()
+
     # if launched with arg "play"
     if len(sys.argv) > 1 and sys.argv[1] == 'play':
         # Start game loop
         while True:
-            # Redraw background and pacman
-            draw()
-
             # Listen events
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -235,16 +235,20 @@ def main():
                     pac.update(keys)
                 pygame.display.flip()
     else:
-        draw()
-
         # DFS
         run_alg(pac.dfs)
 
         # Replace pacman to starting (random) position
         pac = Pacman(x_pac, y_pac)
 
-        # Greedy alogithm
-        run_alg(pac.greedy, arg=fruit)
+        # BFS
+        run_alg(pac.bfs)
+
+        # Replace pacman to starting (random) position
+        pac = Pacman(x_pac, y_pac)
+
+        # Greedy algorithm
+        run_alg(pac.dfs, arg={"greedy": True, "fruit": fruit})
 
         # Infinite loop, waiting for closing
         while True:
@@ -287,14 +291,14 @@ def get_random_place(character: str):
     # Scale
     x *= BLOCK_SIZE
     y *= BLOCK_SIZE
-    return (x + 8, y + 8)
+    return x + 8, y + 8
 
 
-def run_alg(func, arg=None):
+def run_alg(func, arg={}):
     """Run algorithm, measure memory costs."""
     time.sleep(2)
     tracemalloc.start()
-    func(arg) if arg else func()
+    func(**arg) if arg else func()
     snapshot = tracemalloc.take_snapshot()
     stats = snapshot.statistics('lineno')
     total = sum([s.size for s in stats])
