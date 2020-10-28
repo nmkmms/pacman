@@ -1,5 +1,6 @@
 import sys, time
 from collections import deque
+import heapq
 from random import randint, shuffle
 import pygame
 import tracemalloc
@@ -141,11 +142,19 @@ class Pacman(pygame.sprite.Sprite):
         else:
             print(f"Statistic for greedy algorithm:\n\tSteps: {steps}")
 
-    def bfs(self):
-        """Finds a way to the fruit using breadth-first search algorithm."""
+    def bfs(self, a_star=False, fruit=None):
+        """Finds a way to the fruit using breadth-first search algorithm.
+
+        if a_star = True => uses A* algorithm
+        """
         steps = 0
-        queue = deque()
-        queue.extend([[route] for route in self.get_route()])
+        if a_star:
+            queue = []
+            for route in self.get_route():
+                heapq.heappush(queue, (1, [route]))
+        else:
+            queue = deque()
+            queue.extend([[route] for route in self.get_route()])
         current_way = []
         was_here = set()
 
@@ -157,7 +166,10 @@ class Pacman(pygame.sprite.Sprite):
             steps += 1
 
         while queue:
-            nxt = queue.popleft()
+            if a_star:
+                nxt = heapq.heappop(queue)[1]
+            else:
+                nxt = queue.popleft()
             while len(current_way) > len(nxt):
                 make_step(self.opposite_way[current_way.pop()])
             while nxt[:len(current_way)] != current_way:
@@ -172,13 +184,19 @@ class Pacman(pygame.sprite.Sprite):
                 was_here.add(place)
                 for way in self.get_route():
                     if way != self.opposite_way[current_way[-1]]:
-                        queue.append(list(current_way + [way]))
+                        if a_star:
+                            heapq.heappush(queue, (self.a_star_heuristic(list(current_way + [way]), fruit), list(current_way + [way])))
+                        else:
+                            queue.append(list(current_way + [way]))
 
-        print(f"Statistic for BFS:\n\tSteps: {steps}")
+        if a_star:
+            print(f"Statistic for A*:\n\tSteps: {steps}")
+        else:
+            print(f"Statistic for BFS:\n\tSteps: {steps}")
 
     def manhattan_sort(self, stack: list, fruit: Fruit):
         """Sort route list using manhattan distance.
-        
+
         From bigger to lower.
         """
         pos_x, pos_y = self.get_position()
@@ -193,6 +211,14 @@ class Pacman(pygame.sprite.Sprite):
             'down':  val_func(fruit_y, pos_y)
         }
         stack.sort(key=lambda x: abs(abs(pos_x - fruit_x) + abs(pos_y - fruit_y) - val_route[x]), reverse=True)
+
+    def a_star_heuristic(self, element: list, fruit: Fruit):
+        """Return heuristic for current position in A* algorithm."""
+        pos_x, pos_y = self.get_position()
+        fruit_x = fruit.rect.x // BLOCK_SIZE
+        fruit_y = fruit.rect.y // BLOCK_SIZE
+
+        return abs(pos_x - fruit_x) + abs(pos_y + fruit_y) + len(element)
 
 
 def main():
@@ -237,7 +263,7 @@ def main():
     else:
         # DFS
         run_alg(pac.dfs)
-
+        #
         # Replace pacman to starting (random) position
         pac = Pacman(x_pac, y_pac)
 
@@ -249,6 +275,11 @@ def main():
 
         # Greedy algorithm
         run_alg(pac.dfs, arg={"greedy": True, "fruit": fruit})
+
+        # Replace pacman to starting (random) position
+        pac = Pacman(x_pac, y_pac)
+
+        run_alg(pac.bfs, arg={"a_star": True, "fruit": fruit})
 
         # Infinite loop, waiting for closing
         while True:
@@ -296,6 +327,8 @@ def get_random_place(character: str):
 
 def run_alg(func, arg={}):
     """Run algorithm, measure memory costs."""
+    time.sleep(2)
+    draw()
     time.sleep(2)
     tracemalloc.start()
     func(**arg) if arg else func()
